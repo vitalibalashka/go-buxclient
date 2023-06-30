@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -542,7 +543,15 @@ func (h *TransportHTTP) doHTTPRequest(ctx context.Context, method string, path s
 		return err
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
-		return errors.New("server error: " + strconv.Itoa(resp.StatusCode) + " - " + resp.Status)
+		var errorMsg string
+		err = json.NewDecoder(resp.Body).Decode(&errorMsg)
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				return err
+			}
+			errorMsg = resp.Status
+		}
+		return errors.New("server error: " + strconv.Itoa(resp.StatusCode) + " - " + errorMsg)
 	}
 
 	return json.NewDecoder(resp.Body).Decode(&responseJSON)
